@@ -1,0 +1,2 @@
+# ontoGen
+Automatic Ontology Generator
