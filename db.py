@@ -520,7 +520,7 @@ def register_object(table,columns,keys,row,swizzle_table,global_params):
         global_params['dbo_out'].commit()        
     
     where = where_key(row)
-
+    
     key_names = [d['Field'] for d in keys]
     keystring = ','.join(key_names)
     

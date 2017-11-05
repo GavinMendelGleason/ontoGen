@@ -10,7 +10,7 @@ usepat = re.compile('.*USE .*')
 gopat = re.compile('^GO.*')
 setpat = re.compile('^SET.*')
 emptypat = re.compile('^\s*$')
-termpat = re.compile(".*;\s*$")
+termpat = re.compile(".*;|,\s*$")
 insertintopat = re.compile("^INSERT INTO",re.I)
 msnewlinepat = re.compile(r'(.*)\r\n')
 
@@ -18,7 +18,15 @@ msnewlinepat = re.compile(r'(.*)\r\n')
 fixquotes = re.compile('\[([^\]]*)\]')
 fixstrings = re.compile("N'")
 fixdbname = re.compile('"[^"]*"\.')
-fixdate = re.compile('DateTime')
+fixwith = re.compile('WITH.*$')
+fixguid = re.compile('ROWGUIDCOL')
+fixonprimary = re.compile('ON [PRIMARY]')
+
+fixdate = re.compile('\[DateTime\]|\[datetime\]')
+fixint = re.compile('\[int\]')
+fixvarchar = re.compile('\[varchar\]')
+fixtinyint = re.compile('\[tinyint\]')
+fixunique = re.compile('\[uniqueidentifier\]')
 
 def passes(line):
     c = line.count('"')
@@ -64,10 +72,18 @@ if __name__ == "__main__":
 
                     if oline:
                         # put transforms here
+                        oline = re.sub(fixdate,'timestamp',oline)
+                        oline = re.sub(fixint,'int',oline)
+                        oline = re.sub(fixvarchar,'varchar',oline)
+                        oline = re.sub(fixtinyint, 'int', oline)
+                        oline = re.sub(fixunique, 'int', oline)
+
+                        oline = re.sub(fixonprimary, '',oline)
                         oline = re.sub(fixquotes,'"\g<1>"',oline)
                         oline = re.sub(fixstrings,"'",oline)
                         oline = re.sub(fixdbname, ('"%s".' % global_params['schema_name']), oline)
-                        oline = re.sub(fixdate,'timestamp',oline)
+                        oline = re.sub(fixwith,'',oline)
+                        
                         if not termpat.match(oline):
                             oline = re.sub(msnewlinepat, r'\g<1>;\n', oline)
                         if not insertintopat.match(oline):
