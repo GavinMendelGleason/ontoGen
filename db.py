@@ -425,8 +425,9 @@ def run_class_construction(class_dict,global_params):
 def where_key(d):
     components = []
     for key in d:
-        components.append('%(key)s = %(value)s' % {'key' : key,
-                                                   'value' : d[key]})
+        if d[key]:
+            components.append('%(key)s = %(value)s' % {'key' : key,
+                                                       'value' : d[key]})
     return ' and '.join(components)
 
 def register_uri(uri,params):
@@ -520,7 +521,7 @@ def register_object(table,columns,keys,row,swizzle_table,global_params):
         global_params['dbo_out'].commit()        
     
     where = where_key(row)
-
+    
     key_names = [d['Field'] for d in keys]
     keystring = ','.join(key_names)
     
