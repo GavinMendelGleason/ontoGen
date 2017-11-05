@@ -258,14 +258,15 @@ def get_type_assignment(ty):
     """This needs to be extended"""
     if re.search('int',ty):
         return 'xsd:integer'
-    elif re.search('varchar',ty) or re.search('text', ty):
+    elif re.search('varchar',ty) or re.search('text', ty) or re.search('character varying',ty):
         return 'xsd:string'
     elif re.search('date',ty):
         return 'xsd:dateTime'
     elif re.search('timestamp without time zone', ty):
-        return 'xsd:dateTime'        
+        return 'xsd:dateTime'
     else:
-        print "About to spew literal, what's up?"
+        print("About to spew literal, what's up?")
+        print("incoming type: %s" % ty)
         raise Exception('buzz kill')
         return 'rdf:Literal'
 
