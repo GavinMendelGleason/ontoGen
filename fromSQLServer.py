@@ -22,7 +22,7 @@ fixwith = re.compile('WITH.*$')
 fixguid = re.compile('ROWGUIDCOL')
 fixonprimary = re.compile('ON [PRIMARY]')
 
-fixdate = re.compile('\[DateTime\]|\[datetime\]')
+fixdate = re.compile('\[DateTime\]|\[datetime\]|DateTime|datetime')
 fixint = re.compile('\[int\]')
 fixvarchar = re.compile('\[varchar\]')
 fixtinyint = re.compile('\[tinyint\]')

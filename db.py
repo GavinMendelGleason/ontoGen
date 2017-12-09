@@ -510,8 +510,16 @@ def insert_typed_quad(sub,pred,val,ty,graph,params):
 
 def register_object(table,columns,keys,row,swizzle_table,global_params):
 
+    # print "Table: %s" % table
     cache_misses = []
-    uri = swizzle_table[table+str(row.values())]
+    if table+str(row.values()) in swizzle_table:
+        uri = swizzle_table[table+str(row.values())]
+    else:
+        miss = {'table' : table,
+                'keyrow' : row}
+                            
+        cache_misses.append(miss)
+        return cache_misses
     
     # Add the type information to triples
     class_uri = class_of(table,global_params)
@@ -597,7 +605,7 @@ where %(key)s = %(val)s""" % { 'field' : rcc['Field'],
         ###### ^^^^ Value reference ############################################
 
     if 'dbo_out' in global_params and global_params['dbo_out']:
-        global_params['dbo_out'].commit()        
+        global_params['dbo_out'].commit()
 
     return cache_misses
 
@@ -615,7 +623,7 @@ def lift_instance_data(tcd, global_params):
     register_uri('rdf:type',global_params)
 
     if global_params['fragment']:
-        limit = " LIMIT 1000"
+        limit = " LIMIT 10000"
     else:
         limit = ""
     # Store information about ids which we didn't load
@@ -678,8 +686,6 @@ def lift_instance_data(tcd, global_params):
         
         new_cache_misses = []
         for elt in cache_misses:
-            print elt
-            print cache_misses
             table = elt['table']                    
             columns = table_columns(table, global_params)
             keys = primary_keys(columns)
@@ -687,11 +693,10 @@ def lift_instance_data(tcd, global_params):
             row = elt['keyrow']
             uri = genid(table, global_params)
             register_uri(uri,global_params)
-            print row
-
+            
             swizzle_table[table+str(row.values())] = uri
             missed = register_object(table,columns,keys,row,swizzle_table,global_params)
-            new_cache_misses.append(missed)
+            new_cache_misses += missed
             
         cache_misses = new_cache_misses
         
