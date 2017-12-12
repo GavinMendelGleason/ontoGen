@@ -237,11 +237,9 @@ WHERE co.table_name = %(table)s;
     return cur.fetchall()
 
 start = 0
-def genid(seed,args):
+def genid(seed,prefix='_'):
     global start
-    # go for blank nodes
-    #uri = args['instance'] + '#' + seed + str(start)
-    uri = '_:' + seed + str(start)
+    uri = prefix ':' + seed + str(start)
     start += 1 
     return uri
 
@@ -469,7 +467,65 @@ def insert_quad(sub,pred,obj,graph,params):
     else:
         triple = render_point(sub,'URI') + u' ' + render_point(pred,'URI') + u' ' + render_point(obj,'URI') + u' .\n'
         params['instance_handle'].write(triple)
-            
+
+def render_otriple(a,b,c,ns):
+    a = expand(a,ns)
+    b = expand(b,ns)
+    c = expand(c,ns)
+    return render_point(a,'URI') + u' ' + render_point(b,'URI') + u' ' + render_point(c,'URI') + u' .\n'
+
+def render_ltriple(a,b,c,ty,ns):
+    a = expand(a,ns)
+    b = expand(b,ns)
+    xsd_ty = expand(ty,ns)
+    return render_point(a,'URI') + u' ' + render_point(b,'URI') + u' ' + render_point(c,xsd_ty) + u' .\n'
+
+def create_prov_db(params):
+    ns = params['namespace']
+    triple = u''
+
+    db = genid(params['db'],'dacuraDataset')
+    triple += render_otriple(db,'rdf:type','dacura:Database',ns)
+    triple += render_ltriple(db,'dacuraDataset:dbType',params['variant'],'xsd:string',ns)
+    triple += render_ltriple(db,'dacuraDataset:dbHost',params['host'],'xsd:string',ns)
+    triple += render_ltriple(db,'dacuraDataset:dbName',params['db'],'xsd:string',ns)
+    triple += render_ltriple(db,'rdfs:label',params['db'],'xsd:string',ns)
+    triple += render_otriple(db,'prov:CreatedBy','dacuraDataset:ontoGen',ns)
+    
+    params['prov_handle'].write(triple)
+    
+    return db
+
+def create_prov_table(dburi,table,columns,params):
+    ns = params['namespace']
+    triple = u''
+
+    table = genid(table,'dacuraDataset')
+    triple += render_otriple(table,'rdf:type','dacuraDataset:Table',ns)
+    triple += render_ltriple(table,'rdfs:label',table,'xsd:string',ns)
+    triple += render_otriple(table,'dacuraDataset:inDB',db,ns)
+
+    column_map = {}
+    for column in columns:
+        column_uri = genid(column['Field'])
+        triple += render_otriple(column_uri,'rdf:type','dacuraDataset:Column',ns)
+        triple += render_ltriple(column_uri,'rdfs:label',column['Field'],'xsd:string',ns)
+        triple += render_ltriple(column_uri,'dacuraDataset:type', colum['Type'],'xsd:string',ns)
+        triple += render_otriple(column_uri,'dacuraDataset:table', table, ns)
+                                 
+        column_map[column['Field']] = column_uri
+    
+    params['prov_handle'].write(triple)
+    
+    return column_map
+
+def insert_prov_record(sub,column_uri,params):
+    ns = params['namespace']
+    triple = u''
+    triple += render_otriple(sub,'dacuraDataset:inColumn',column_uri,ns)
+    params['prov_handle'].write(triple)
+
+        
 def insert_typed_quad(sub,pred,val,ty,graph,params):
     ns = params['namespace']
     sub = expand(sub,ns)
@@ -525,6 +581,7 @@ def register_object(table,columns,keys,row,swizzle_table,global_params):
     class_uri = class_of(table,global_params)
     register_uri(class_uri,global_params)
     insert_quad(uri,'rdf:type',class_uri,global_params['instance'],global_params)
+    prov_column_map = create_prov_table(uri,table,columns,global_params)
     
     if 'dbo_out' in global_params and global_params['dbo_out']:
         global_params['dbo_out'].commit()        
@@ -581,6 +638,8 @@ where %(key)s = %(val)s""" % { 'field' : rcc['Field'],
                             register_uri(pred_uri,global_params)
                             register_uri(obj_uri,global_params)
                             insert_quad(uri,pred_uri,obj_uri,global_params['instance'],global_params)
+                            column_uri = prov_column_map[c['Field']]                            
+                            insert_prov_record(uri,column_uri,global_params)
                             if 'dbo_out' in global_params and global_params['dbo_out']:
                                 global_params['dbo_out'].commit()
                         else:
@@ -600,6 +659,9 @@ where %(key)s = %(val)s""" % { 'field' : rcc['Field'],
             register_uri(uri,global_params)
             register_uri(pred_uri,global_params)          
             insert_typed_quad(uri,pred_uri,val,ty,global_params['instance'],global_params)
+            column_uri = prov_column_map[c['Field']]                            
+            insert_prov_record(uri,column_uri,global_params)
+
             if 'dbo_out' in global_params and global_params['dbo_out']:
                 global_params['dbo_out'].commit()        
         ###### ^^^^ Value reference ############################################
@@ -621,6 +683,7 @@ def lift_instance_data(tcd, global_params):
     register_uri(global_params['instance'],global_params)
     # also put rdf:type in the db
     register_uri('rdf:type',global_params)
+    provdburi = create_prov_db(params)
 
     if global_params['fragment']:
         limit = " LIMIT 10000"
@@ -631,6 +694,8 @@ def lift_instance_data(tcd, global_params):
     
     # Pass 1 to get swizzle table
     for table in tables:
+        prov_table_obj = pass
+        
         columns = table_columns(table, global_params)
 
         keys = primary_keys(columns)
@@ -649,7 +714,7 @@ def lift_instance_data(tcd, global_params):
 
         cursor.execute(stmt)
         for row in cursor:
-            uri = genid(table, global_params)
+            uri = genid(table,'instance')
 
             swizzle_table[table+str(row.values())] = uri
 
@@ -691,7 +756,7 @@ def lift_instance_data(tcd, global_params):
             keys = primary_keys(columns)
 
             row = elt['keyrow']
-            uri = genid(table, global_params)
+            uri = genid(table, 'instance')
             register_uri(uri,global_params)
             
             swizzle_table[table+str(row.values())] = uri
@@ -754,8 +819,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Translate from MySQL or PostgreSQL to OWL.')
     parser.add_argument('--schema-out', help='Turtle file containing schema', default='schema.ttl')
     parser.add_argument('--instance-out', help='N-triple format output', default='instance.nt')
+    parser.add_argument('--prov-out', help='N-triple prov output', default='prov.nt')
     parser.add_argument('--variant', help='Database variant (input)', default=config.VARIANT)
-    parser.add_argument('--db', help='Log file', default=config.DB)
+    parser.add_argument('--db', help='Database name', default=config.DB)
     parser.add_argument('--user', help='DB User', default=config.USER)
     parser.add_argument('--passwd', help='DB passwd', default=config.PASSWORD)
     parser.add_argument('--host', help='DB host', default=config.HOST)
@@ -788,6 +854,7 @@ if __name__ == "__main__":
     global_params['domain_name'] = global_params['db']
 
     global_params['namespace'] = {'dacura' : 'http://dacura.scss.tcd.ie/ontology/dacura#',
+                                  'instance' : 'http://dacura.scss.tcd.ie/instance/dacura#',
                                   'owl' : 'http://www.w3.org/2002/07/owl#', 
                                   'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
                                   'rdfs' : 'http://www.w3.org/2000/01/rdf-schema#',
@@ -812,5 +879,9 @@ if __name__ == "__main__":
         
     if global_params['variant_out'] == 'ntriples':
         global_params['instance_handle'] = codecs.open(global_params['instance_out'], "w", encoding='utf8')
+        global_params['prov_handle'] = codecs.open(global_params['prov_out'], "w", encoding='utf8')
+
+    if global_params['variant_out'] != 'ntriples':
+        raise Exception("Everything has gone terribly wrong since DB variants are not currently PROV-O-ified.")
         
     lift_instance_data(tcd,global_params)
