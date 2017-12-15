@@ -239,7 +239,7 @@ WHERE co.table_name = %(table)s;
 start = 0
 def genid(seed,prefix='_'):
     global start
-    uri = prefix ':' + seed + str(start)
+    uri = prefix + ':' + seed + str(start)
     start += 1 
     return uri
 
@@ -503,14 +503,14 @@ def create_prov_table(dburi,table,columns,params):
     table = genid(table,'dacuraDataset')
     triple += render_otriple(table,'rdf:type','dacuraDataset:Table',ns)
     triple += render_ltriple(table,'rdfs:label',table,'xsd:string',ns)
-    triple += render_otriple(table,'dacuraDataset:inDB',db,ns)
+    triple += render_otriple(table,'dacuraDataset:inDB',dburi,ns)
 
     column_map = {}
     for column in columns:
         column_uri = genid(column['Field'])
         triple += render_otriple(column_uri,'rdf:type','dacuraDataset:Column',ns)
         triple += render_ltriple(column_uri,'rdfs:label',column['Field'],'xsd:string',ns)
-        triple += render_ltriple(column_uri,'dacuraDataset:type', colum['Type'],'xsd:string',ns)
+        triple += render_ltriple(column_uri,'dacuraDataset:type', column['Type'],'xsd:string',ns)
         triple += render_otriple(column_uri,'dacuraDataset:table', table, ns)
                                  
         column_map[column['Field']] = column_uri
@@ -581,7 +581,7 @@ def register_object(table,columns,keys,row,swizzle_table,global_params):
     class_uri = class_of(table,global_params)
     register_uri(class_uri,global_params)
     insert_quad(uri,'rdf:type',class_uri,global_params['instance'],global_params)
-    prov_column_map = create_prov_table(uri,table,columns,global_params)
+    prov_column_map = create_prov_table(global_params['db_uri'],table,columns,global_params)
     
     if 'dbo_out' in global_params and global_params['dbo_out']:
         global_params['dbo_out'].commit()        
@@ -683,7 +683,7 @@ def lift_instance_data(tcd, global_params):
     register_uri(global_params['instance'],global_params)
     # also put rdf:type in the db
     register_uri('rdf:type',global_params)
-    provdburi = create_prov_db(params)
+    global_params['db_uri'] = create_prov_db(global_params)
 
     if global_params['fragment']:
         limit = " LIMIT 10000"
@@ -694,7 +694,6 @@ def lift_instance_data(tcd, global_params):
     
     # Pass 1 to get swizzle table
     for table in tables:
-        prov_table_obj = pass
         
         columns = table_columns(table, global_params)
 
@@ -854,6 +853,7 @@ if __name__ == "__main__":
     global_params['domain_name'] = global_params['db']
 
     global_params['namespace'] = {'dacura' : 'http://dacura.scss.tcd.ie/ontology/dacura#',
+                                  'dacuraDataset' : 'http://dacura.scss.tcd.ie/ontology/dacuraDataset#',
                                   'instance' : 'http://dacura.scss.tcd.ie/instance/dacura#',
                                   'owl' : 'http://www.w3.org/2002/07/owl#', 
                                   'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
