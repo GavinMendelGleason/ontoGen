@@ -466,7 +466,7 @@ def insert_quad(sub,pred,obj,graph,params):
             logging.info(render_point(sub,'URI') + ' ' + render_point(pred,'URI') + ' ' + render_point(obj,'URI') + ' .\n')
     else:
         s = params['instance_handle']
-        render_ttl_triple(sub,pred,obj,s)
+        render_ttl_triple(sub,pred,obj,graph,s)
 
 def render_otriple(a,b,c,ns):
     a = expand(a,ns)
@@ -480,35 +480,52 @@ def render_ltriple(a,b,c,ty,ns):
     xsd_ty = expand(ty,ns)
     return render_point(a,'URI') + u' ' + render_point(b,'URI') + u' ' + render_point(c,xsd_ty) + u' .\n'
 
-def render_obj_or_lit(o):
+def obj_or_lit(o):
     if type(o) is tuple:
         (l,ty) = o
-        return l + u'^^' + ty
+        if isinstance(l,str):
+            l = l.decode("utf8") # didn't convert yet
+
+        if ty == 'x:dateTime':
+            l = l.isoformat()
+        elif ty == 'x:string':
+            l = l.replace('\\','\\\\')
+            l = l.replace('"','\\"')
+        s = u'"%s"^^%s' % (l, ty)
+        return s
     else:
         return o
         
 last_subject = None
 last_predicate = None
-def render_ttl_triple(a,b,c,stream):
-    global last_subject, last_predicate
-    if a == last_subject:
-        if b == last_predicate:
-            stream.write(u' ,\n\t\t' + render_obj_or_lit(c))
+_graph_map = {}
+def render_ttl_triple(a,b,c,g,stream):
+    if not (g in _graph_map): 
+        _graph_map[g] = {'last_subject' : None, 'last_predicate' : None}
+        
+    if a == _graph_map[g]['last_subject']:
+        if b == _graph_map[g]['last_predicate']:
+            stream.write(u' ,\n\t\t' + obj_or_lit(c))
         else:
-            stream.write(u' ;\n\t' + b + u' ' + render_obj_or_lit(c))
-    else:                   
-        stream.write(u' .\n\n' + a + u' ' + b + u' ' + render_obj_or_lit(c))
+            stream.write(u' ;\n\t' + b + u' ' + obj_or_lit(c))
+    elif _graph_map[g]['last_subject'] == None:
+        stream.write(a + u' ' + b + u' ' + obj_or_lit(c))
+    else:	                   
+        stream.write(u' .\n\n' + a + u' ' + b + u' ' + obj_or_lit(c))
+
+    _graph_map[g]['last_subject'] = a
+    _graph_map[g]['last_predicate'] = b
     
 def create_prov_db(params):
     s = params['prov_handle']
 
     db = genid(params['db'],'d')
-    render_ttl_triple(db,'a','d:Database',s)
-    render_ttl_triple(db,'d:dbType',(params['variant'],'x:string'),s)
-    render_ttl_triple(db,'d:dbHost',(params['host'],'x:string'),s)
-    render_ttl_triple(db,'d:dbName',(params['db'],'x:string'),s)
-    render_ttl_triple(db,'r:label',(params['db'],'x:string'),s)
-    render_ttl_triple(db,'p:CreatedBy','dd:ontoGen',s)
+    render_ttl_triple(db,'a','d:Database','prov',s)
+    render_ttl_triple(db,'d:dbType',(params['variant'],'x:string'),'prov',s)
+    render_ttl_triple(db,'d:dbHost',(params['host'],'x:string'),'prov',s)
+    render_ttl_triple(db,'d:dbName',(params['db'],'x:string'),'prov',s)
+    render_ttl_triple(db,'r:label',(params['db'],'x:string'),'prov',s)
+    render_ttl_triple(db,'p:CreatedBy','dd:ontoGen','prov',s)
     
     return db
 
@@ -516,22 +533,22 @@ def create_prov_table(dburi,table,columns,params):
     s = params['prov_handle']
 
     table = genid(table,'d')
-    render_ttl_triple(table,'a','d:Table',s)
-    render_ttl_triple(table,'r:label',(table,'x:string'),s)
-    render_ttl_triple(table,'d:inDB',dburi,s)
+    render_ttl_triple(table,'a','d:Table','prov',s)
+    render_ttl_triple(table,'r:label',(table,'x:string'),'prov',s)
+    render_ttl_triple(table,'d:inDB',dburi,'prov',s)
 
     column_map = {}
     for column in columns:
         idx = 0
         key_uri = None
         column_uri = genid(column['Field'],'d')
-        render_ttl_triple(column_uri,'a','d:Column',s)
-        render_ttl_triple(column_uri,'r:label', (column['Field'],'x:string'),s)
-        render_ttl_triple(column_uri,'d:type', (column['Type'],'x:string'),s)
-        render_ttl_triple(column_uri,'d:table', table, s)
+        render_ttl_triple(column_uri,'a','d:Column','prov',s)
+        render_ttl_triple(column_uri,'r:label', (column['Field'],'x:string'),'prov',s)
+        render_ttl_triple(column_uri,'d:type', (column['Type'],'x:string'),'prov',s)
+        render_ttl_triple(column_uri,'d:table', table,'prov',s)
 
         if is_primary(column):
-            triple += render_ttl_triple(column_uri,'d:isPrimaryKey',('true','x:boolean'),s)
+            render_ttl_triple(column_uri,'d:isPrimaryKey',('true','x:boolean'),'prov',s)
         
         column_map[column['Field']] = column_uri
     
@@ -574,7 +591,7 @@ def insert_typed_quad(sub,pred,val,ty,graph,params):
     else:
         xsdty = get_type_assignment(ty)
         s = params['instance_handle']
-        render_ttl_triple(sub,pred,(val,xsdty),s)
+        render_ttl_triple(sub,pred,(val,xsdty),graph,s)
 
 def register_object(table,columns,keys,row,swizzle_table,global_params):
 
