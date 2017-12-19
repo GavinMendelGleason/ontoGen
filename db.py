@@ -255,13 +255,13 @@ def is_primary (column):
 def get_type_assignment(ty):
     """This needs to be extended"""
     if re.search('int',ty):
-        return 'xsd:integer'
+        return 'x:integer'
     elif re.search('varchar',ty) or re.search('text', ty) or re.search('character varying',ty):
-        return 'xsd:string'
+        return 'x:string'
     elif re.search('date',ty):
-        return 'xsd:dateTime'
+        return 'x:dateTime'
     elif re.search('timestamp without time zone', ty):
-        return 'xsd:dateTime'
+        return 'x:dateTime'
     else:
         print("About to spew literal, what's up?")
         print("incoming type: %s" % ty)
@@ -465,8 +465,8 @@ def insert_quad(sub,pred,obj,graph,params):
             logging.info("Failed to write point:\n")
             logging.info(render_point(sub,'URI') + ' ' + render_point(pred,'URI') + ' ' + render_point(obj,'URI') + ' .\n')
     else:
-        triple = render_point(sub,'URI') + u' ' + render_point(pred,'URI') + u' ' + render_point(obj,'URI') + u' .\n'
-        params['instance_handle'].write(triple)
+        s = params['instance_handle']
+        render_ttl_triple(sub,pred,obj,s)
 
 def render_otriple(a,b,c,ns):
     a = expand(a,ns)
@@ -480,51 +480,67 @@ def render_ltriple(a,b,c,ty,ns):
     xsd_ty = expand(ty,ns)
     return render_point(a,'URI') + u' ' + render_point(b,'URI') + u' ' + render_point(c,xsd_ty) + u' .\n'
 
-def create_prov_db(params):
-    ns = params['namespace']
-    triple = u''
-
-    db = genid(params['db'],'dacuraDataset')
-    triple += render_otriple(db,'rdf:type','dacura:Database',ns)
-    triple += render_ltriple(db,'dacuraDataset:dbType',params['variant'],'xsd:string',ns)
-    triple += render_ltriple(db,'dacuraDataset:dbHost',params['host'],'xsd:string',ns)
-    triple += render_ltriple(db,'dacuraDataset:dbName',params['db'],'xsd:string',ns)
-    triple += render_ltriple(db,'rdfs:label',params['db'],'xsd:string',ns)
-    triple += render_otriple(db,'prov:CreatedBy','dacuraDataset:ontoGen',ns)
+def render_obj_or_lit(o):
+    if type(o) is tuple:
+        (l,ty) = o
+        return l + u'^^' + ty
+    else:
+        return o
+        
+last_subject = None
+last_predicate = None
+def render_ttl_triple(a,b,c,stream):
+    global last_subject, last_predicate
+    if a == last_subject:
+        if b == last_predicate:
+            stream.write(u' ,\n\t\t' + render_obj_or_lit(c))
+        else:
+            stream.write(u' ;\n\t' + b + u' ' + render_obj_or_lit(c))
+    else:                   
+        stream.write(u' .\n\n' + a + u' ' + b + u' ' + render_obj_or_lit(c))
     
-    params['prov_handle'].write(triple)
+def create_prov_db(params):
+    s = params['prov_handle']
+
+    db = genid(params['db'],'d')
+    render_ttl_triple(db,'a','d:Database',s)
+    render_ttl_triple(db,'d:dbType',(params['variant'],'x:string'),s)
+    render_ttl_triple(db,'d:dbHost',(params['host'],'x:string'),s)
+    render_ttl_triple(db,'d:dbName',(params['db'],'x:string'),s)
+    render_ttl_triple(db,'r:label',(params['db'],'x:string'),s)
+    render_ttl_triple(db,'p:CreatedBy','dd:ontoGen',s)
     
     return db
 
 def create_prov_table(dburi,table,columns,params):
-    ns = params['namespace']
-    triple = u''
+    s = params['prov_handle']
 
-    table = genid(table,'dacuraDataset')
-    triple += render_otriple(table,'rdf:type','dacuraDataset:Table',ns)
-    triple += render_ltriple(table,'rdfs:label',table,'xsd:string',ns)
-    triple += render_otriple(table,'dacuraDataset:inDB',dburi,ns)
+    table = genid(table,'d')
+    render_ttl_triple(table,'a','d:Table',s)
+    render_ttl_triple(table,'r:label',(table,'x:string'),s)
+    render_ttl_triple(table,'d:inDB',dburi,s)
 
     column_map = {}
     for column in columns:
-        column_uri = genid(column['Field'])
-        triple += render_otriple(column_uri,'rdf:type','dacuraDataset:Column',ns)
-        triple += render_ltriple(column_uri,'rdfs:label',column['Field'],'xsd:string',ns)
-        triple += render_ltriple(column_uri,'dacuraDataset:type', column['Type'],'xsd:string',ns)
-        triple += render_otriple(column_uri,'dacuraDataset:table', table, ns)
-                                 
+        idx = 0
+        key_uri = None
+        column_uri = genid(column['Field'],'d')
+        render_ttl_triple(column_uri,'a','d:Column',s)
+        render_ttl_triple(column_uri,'r:label', (column['Field'],'x:string'),s)
+        render_ttl_triple(column_uri,'d:type', (column['Type'],'x:string'),s)
+        render_ttl_triple(column_uri,'d:table', table, s)
+
+        if is_primary(column):
+            triple += render_ttl_triple(column_uri,'d:isPrimaryKey',('true','x:boolean'),s)
+        
         column_map[column['Field']] = column_uri
-    
-    params['prov_handle'].write(triple)
     
     return column_map
 
 def insert_prov_record(sub,column_uri,params):
-    ns = params['namespace']
-    triple = u''
-    triple += render_otriple(sub,'dacuraDataset:inColumn',column_uri,ns)
-    params['prov_handle'].write(triple)
-
+    s = params['prov_handle']
+    render_ttl_triple(sub,'d:inColumn',column_uri,s)
+    return None
         
 def insert_typed_quad(sub,pred,val,ty,graph,params):
     ns = params['namespace']
@@ -533,9 +549,7 @@ def insert_typed_quad(sub,pred,val,ty,graph,params):
     # testing
     xsdty = get_type_assignment(ty)
     xsdtyex = expand(xsdty,ns)
-    #logging.info(render_point(sub,'URI') + ' ' + render_point(pred,'URI') + ' ' + render_point(val,ty) + ' ' + render_point(graph,'URI') + ' .\n')
-    #logging.info("Version: %s" % (params['commit-version'],))
-
+  
     if params['variant_out'] == 'postgres' and params['dbo_out']:
         cur = global_params['dbo_out'].cursor()
         try: 
@@ -559,10 +573,8 @@ def insert_typed_quad(sub,pred,val,ty,graph,params):
 
     else:
         xsdty = get_type_assignment(ty)
-        xsdtyex = expand(xsdty,ns)
-        triple = render_point(sub,'URI') + u' ' + render_point(pred,'URI') + u' ' + render_point(val,xsdtyex) + u' .\n'
-
-        params['instance_handle'].write(triple)
+        s = params['instance_handle']
+        render_ttl_triple(sub,pred,(val,xsdty),s)
 
 def register_object(table,columns,keys,row,swizzle_table,global_params):
 
@@ -580,7 +592,7 @@ def register_object(table,columns,keys,row,swizzle_table,global_params):
     # Add the type information to triples
     class_uri = class_of(table,global_params)
     register_uri(class_uri,global_params)
-    insert_quad(uri,'rdf:type',class_uri,global_params['instance'],global_params)
+    insert_quad(uri,'a',class_uri,global_params['instance'],global_params)
     prov_column_map = create_prov_table(global_params['db_uri'],table,columns,global_params)
     
     if 'dbo_out' in global_params and global_params['dbo_out']:
@@ -825,7 +837,7 @@ if __name__ == "__main__":
     parser.add_argument('--passwd', help='DB passwd', default=config.PASSWORD)
     parser.add_argument('--host', help='DB host', default=config.HOST)
 
-    parser.add_argument('--variant-out', help='Database variant (output). One of \'postgres\',\'mysql\',\'ntriples\'', default=config.VARIANT_OUT)
+    parser.add_argument('--variant-out', help='Database variant (output). One of \'postgres\',\'mysql\',\'turtle\'', default=config.VARIANT_OUT)
     parser.add_argument('--db-out', help='', default=config.DB_OUT)
     parser.add_argument('--user-out', help='', default=config.USER_OUT)
     parser.add_argument('--passwd-out', help='', default=config.PASSWORD_OUT)
@@ -877,11 +889,31 @@ if __name__ == "__main__":
     with codecs.open(global_params['schema_out'], "w", encoding='utf8') as f:
         f.write(schema)
         
-    if global_params['variant_out'] == 'ntriples':
+    if global_params['variant_out'] == 'turtle':
+        instance_ns = {'d' : 'http://dacura.scss.tcd.ie/ontology/dacuraDataset#',
+                       'r' : 'http://www.w3.org/2000/01/rdf-schema#',
+                       'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+                       'x' : 'http://www.w3.org/2001/XMLSchema#',
+                       'i' : 'http://dacura.scss.tcd.ie/instance/dacura#'}
         global_params['instance_handle'] = codecs.open(global_params['instance_out'], "w", encoding='utf8')
+        
         global_params['prov_handle'] = codecs.open(global_params['prov_out'], "w", encoding='utf8')
+        prov_ns = {'d' : 'http://dacura.scss.tcd.ie/ontology/dacuraDataset#',
+                   'r' : 'http://www.w3.org/2000/01/rdf-schema#',
+                   'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+                   'x' : 'http://www.w3.org/2001/XMLSchema#',
+                   'p' : 'http://www.w3.org/ns/prov#'}
+        global_params['prov_handle'].write(render_turtle_namespace(prov_ns))
 
-    if global_params['variant_out'] != 'ntriples':
+    if global_params['variant_out'] != 'turtle':
         raise Exception("Everything has gone terribly wrong since DB variants are not currently PROV-O-ified.")
         
     lift_instance_data(tcd,global_params)
+
+
+    if global_params['variant_out'] == 'turtle':
+        global_params['instance_handle'].write('.')
+        global_params['instance_handle'].close()
+
+        global_params['prov_handle'].write('.')
+        global_params['prov_handle'].close()
