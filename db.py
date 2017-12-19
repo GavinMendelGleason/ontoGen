@@ -562,7 +562,7 @@ def insert_prov_record(obj,column_uri,params):
 def insert_literal_prov_record(sub,pred,column_uri,params):
     s = params['prov_handle']
     render_ttl_triple(sub,'d:valInColumn',column_uri,'prov',s)
-    render_ttl_triple(sub,'d:usingPred',pred_uri,'prov',s)
+    render_ttl_triple(sub,'d:usingPred',pred,'prov',s)
     return None
 
 def insert_typed_quad(sub,pred,val,ty,graph,params):
