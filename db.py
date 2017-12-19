@@ -430,7 +430,7 @@ def where_key(d):
     return ' and '.join(components)
 
 def register_uri(uri,params):
-    uri = expand(uri,params['namespace'])
+    #uri = expand(uri,params['namespace'])
     if params['variant_out'] == 'postgres' and params['dbo_out']:
         cur = global_params['dbo_out'].cursor()
         try:
@@ -448,11 +448,11 @@ def register_uri(uri,params):
         raise Exception("Only postgres variant works as yet, non-postgres variant specified")
 
 def insert_quad(sub,pred,obj,graph,params):
-    ns = params['namespace']
-    sub = expand(sub,ns)
-    pred = expand(pred,ns)
-    obj = expand(obj,ns)
-    graph = expand(graph,ns)
+    #ns = params['namespace']
+    #sub = expand(sub,ns)
+    #pred = expand(pred,ns)
+    #obj = expand(obj,ns)
+    #graph = expand(graph,ns)
     # testing
     #logging.info(render_point(sub,'URI') + ' ' + render_point(pred,'URI') + ' ' + render_point(obj,'URI') + ' ' + render_point(graph,'URI') + ' .\n')
     #logging.info("Version: %s" % (params['commit-version'],))
@@ -554,18 +554,24 @@ def create_prov_table(dburi,table,columns,params):
     
     return column_map
 
-def insert_prov_record(sub,column_uri,params):
+def insert_prov_record(obj,column_uri,params):
     s = params['prov_handle']
-    render_ttl_triple(sub,'d:inColumn',column_uri,s)
+    render_ttl_triple(obj,'d:inColumn',column_uri,'prov',s)
     return None
-        
+
+def insert_prov_record(sub,pred,column_uri,params):
+    s = params['prov_handle']
+    render_ttl_triple(sub,'d:valInColumn',column_uri,'prov',s)
+    render_ttl_triple(sub,'d:usingPred',pred_uri,'prov',s)
+    return None
+
 def insert_typed_quad(sub,pred,val,ty,graph,params):
     ns = params['namespace']
-    sub = expand(sub,ns)
-    pred = expand(pred,ns)
+    #sub = expand(sub,ns)
+    #pred = expand(pred,ns)
     # testing
-    xsdty = get_type_assignment(ty)
-    xsdtyex = expand(xsdty,ns)
+    #xsdty = get_type_assignment(ty)
+    #xsdtyex = expand(xsdty,ns)
   
     if params['variant_out'] == 'postgres' and params['dbo_out']:
         cur = global_params['dbo_out'].cursor()
@@ -668,7 +674,7 @@ where %(key)s = %(val)s""" % { 'field' : rcc['Field'],
                             register_uri(obj_uri,global_params)
                             insert_quad(uri,pred_uri,obj_uri,global_params['instance'],global_params)
                             column_uri = prov_column_map[c['Field']]                            
-                            insert_prov_record(uri,column_uri,global_params)
+                            insert_prov_record(obj_uri,column_uri,global_params)
                             if 'dbo_out' in global_params and global_params['dbo_out']:
                                 global_params['dbo_out'].commit()
                         else:
@@ -689,7 +695,7 @@ where %(key)s = %(val)s""" % { 'field' : rcc['Field'],
             register_uri(pred_uri,global_params)          
             insert_typed_quad(uri,pred_uri,val,ty,global_params['instance'],global_params)
             column_uri = prov_column_map[c['Field']]                            
-            insert_prov_record(uri,column_uri,global_params)
+            insert_literal_prov_record(uri,pred_uri,column_uri,global_params)
 
             if 'dbo_out' in global_params and global_params['dbo_out']:
                 global_params['dbo_out'].commit()        
@@ -742,7 +748,7 @@ def lift_instance_data(tcd, global_params):
 
         cursor.execute(stmt)
         for row in cursor:
-            uri = genid(table,'instance')
+            uri = genid(table,'i')
 
             swizzle_table[table+str(row.values())] = uri
 
@@ -784,7 +790,7 @@ def lift_instance_data(tcd, global_params):
             keys = primary_keys(columns)
 
             row = elt['keyrow']
-            uri = genid(table, 'instance')
+            uri = genid(table, 'i')
             register_uri(uri,global_params)
             
             swizzle_table[table+str(row.values())] = uri
@@ -907,13 +913,14 @@ if __name__ == "__main__":
         f.write(schema)
         
     if global_params['variant_out'] == 'turtle':
+        global_params['instance_handle'] = codecs.open(global_params['instance_out'], "w", encoding='utf8')
         instance_ns = {'d' : 'http://dacura.scss.tcd.ie/ontology/dacuraDataset#',
                        'r' : 'http://www.w3.org/2000/01/rdf-schema#',
                        'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
                        'x' : 'http://www.w3.org/2001/XMLSchema#',
                        'i' : 'http://dacura.scss.tcd.ie/instance/dacura#'}
-        global_params['instance_handle'] = codecs.open(global_params['instance_out'], "w", encoding='utf8')
-        
+        global_params['instance_handle'].write(render_turtle_namespace(instance_ns))
+
         global_params['prov_handle'] = codecs.open(global_params['prov_out'], "w", encoding='utf8')
         prov_ns = {'d' : 'http://dacura.scss.tcd.ie/ontology/dacuraDataset#',
                    'r' : 'http://www.w3.org/2000/01/rdf-schema#',
