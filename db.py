@@ -559,7 +559,7 @@ def insert_prov_record(obj,column_uri,params):
     render_ttl_triple(obj,'d:inColumn',column_uri,'prov',s)
     return None
 
-def insert_prov_record(sub,pred,column_uri,params):
+def insert_literal_prov_record(sub,pred,column_uri,params):
     s = params['prov_handle']
     render_ttl_triple(sub,'d:valInColumn',column_uri,'prov',s)
     render_ttl_triple(sub,'d:usingPred',pred_uri,'prov',s)
