@@ -122,7 +122,7 @@ AND g.uri = $4;
                                                    passwd=global_params['passwd_out'],  # your password
                                                    db=global_params['db_out'],        # name of the data base
                                                    charset='utf8')
-    elif global_params['variant_out'] == 'ntriples':
+    elif global_params['variant_out'] == 'turtle':
         # this is fine
         pass
     else:
@@ -441,7 +441,7 @@ def register_uri(uri,params):
             # this probably has to go outside so we can re-obtain the cursor, but fuck it
             time.sleep(10)            
             do_connect(params)
-    elif params['variant_out'] == 'ntriples':
+    elif params['variant_out'] == 'turtle':
         # this is fine
         pass
     else:
@@ -829,8 +829,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Translate from MySQL or PostgreSQL to OWL.')
     parser.add_argument('--schema-out', help='Turtle file containing schema', default='schema.ttl')
-    parser.add_argument('--instance-out', help='N-triple format output', default='instance.nt')
-    parser.add_argument('--prov-out', help='N-triple prov output', default='prov.nt')
+    parser.add_argument('--instance-out', help='Turtle format output', default='instance.ttl')
+    parser.add_argument('--prov-out', help='Turtle prov output', default='prov.ttl')
     parser.add_argument('--variant', help='Database variant (input)', default=config.VARIANT)
     parser.add_argument('--db', help='Database name', default=config.DB)
     parser.add_argument('--user', help='DB User', default=config.USER)
@@ -912,8 +912,8 @@ if __name__ == "__main__":
 
 
     if global_params['variant_out'] == 'turtle':
-        global_params['instance_handle'].write('.')
+        global_params['instance_handle'].write(' .')
         global_params['instance_handle'].close()
 
-        global_params['prov_handle'].write('.')
+        global_params['prov_handle'].write(' .')
         global_params['prov_handle'].close()
