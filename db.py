@@ -525,7 +525,7 @@ def create_prov_db(params):
     render_ttl_triple(db,'d:dbHost',(params['host'],'x:string'),'prov',s)
     render_ttl_triple(db,'d:dbName',(params['db'],'x:string'),'prov',s)
     render_ttl_triple(db,'r:label',(params['db'],'x:string'),'prov',s)
-    render_ttl_triple(db,'p:CreatedBy','dd:ontoGen','prov',s)
+    render_ttl_triple(db,'p:CreatedBy','d:ontoGen','prov',s)
     
     return db
 
@@ -561,8 +561,11 @@ def insert_prov_record(obj,column_uri,params):
 
 def insert_literal_prov_record(sub,pred,column_uri,params):
     s = params['prov_handle']
-    render_ttl_triple(sub,'d:valInColumn',column_uri,'prov',s)
-    render_ttl_triple(sub,'d:usingPred',pred,'prov',s)
+    subobj = genid('litRec','i')
+    render_ttl_triple(sub,'d:literalRecord',subobj,'prov',s)
+    render_ttl_triple(subobj,'a','d:LiteralRecord','prov',s)
+    render_ttl_triple(subobj,'d:valInColumn',column_uri,'prov',s)
+    render_ttl_triple(subobj,'d:usingPred',pred,'prov',s)
     return None
 
 def insert_typed_quad(sub,pred,val,ty,graph,params):
@@ -616,7 +619,6 @@ def register_object(table,columns,keys,row,swizzle_table,global_params):
     class_uri = class_of(table,global_params)
     register_uri(class_uri,global_params)
     insert_quad(uri,'a',class_uri,global_params['instance'],global_params)
-    prov_column_map = create_prov_table(global_params['db_uri'],table,columns,global_params)
     
     if 'dbo_out' in global_params and global_params['dbo_out']:
         global_params['dbo_out'].commit()        
@@ -673,7 +675,7 @@ where %(key)s = %(val)s""" % { 'field' : rcc['Field'],
                             register_uri(pred_uri,global_params)
                             register_uri(obj_uri,global_params)
                             insert_quad(uri,pred_uri,obj_uri,global_params['instance'],global_params)
-                            column_uri = prov_column_map[c['Field']]                            
+                            column_uri = global_params['column_table_map'][table][c['Field']]                            
                             insert_prov_record(obj_uri,column_uri,global_params)
                             if 'dbo_out' in global_params and global_params['dbo_out']:
                                 global_params['dbo_out'].commit()
@@ -694,7 +696,7 @@ where %(key)s = %(val)s""" % { 'field' : rcc['Field'],
             register_uri(uri,global_params)
             register_uri(pred_uri,global_params)          
             insert_typed_quad(uri,pred_uri,val,ty,global_params['instance'],global_params)
-            column_uri = prov_column_map[c['Field']]                            
+            column_uri = global_params['column_table_map'][table][c['Field']]                            
             insert_literal_prov_record(uri,pred_uri,column_uri,global_params)
 
             if 'dbo_out' in global_params and global_params['dbo_out']:
@@ -727,10 +729,13 @@ def lift_instance_data(tcd, global_params):
     # Store information about ids which we didn't load
     cache_misses = []
     
+    global_params['column_table_map'] = {}
     # Pass 1 to get swizzle table
     for table in tables:
         
         columns = table_columns(table, global_params)
+        prov_column_map = create_prov_table(global_params['db_uri'],table,columns,global_params)
+        global_params['column_table_map'][table] = prov_column_map
 
         keys = primary_keys(columns)
         npk = non_primary_keys(columns)
