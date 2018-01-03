@@ -931,7 +931,8 @@ if __name__ == "__main__":
                    'r' : 'http://www.w3.org/2000/01/rdf-schema#',
                    'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
                    'x' : 'http://www.w3.org/2001/XMLSchema#',
-                   'p' : 'http://www.w3.org/ns/prov#'}
+                   'p' : 'http://www.w3.org/ns/prov#',
+                   'i' : 'http://dacura.scss.tcd.ie/instance/dacura#'}
         global_params['prov_handle'].write(render_turtle_namespace(prov_ns))
 
     if global_params['variant_out'] != 'turtle':
