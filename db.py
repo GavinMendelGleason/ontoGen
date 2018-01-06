@@ -522,31 +522,32 @@ _chunk_size = 33000000
 def current_handle(global_params, graph):
     global _graph_map, _chunk_size
 
-    if not (g in _graph_map): 
-        _graph_map[g] = {'last_subject' : None, 'last_predicate' : None, 'triples' : 0, 'chunk' : 0}
+    if not (graph in _graph_map): 
+        _graph_map[graph] = {'last_subject' : None, 'last_predicate' : None, 'triples' : 0, 'chunk' : 0}
     if global_params['chunk_output']:
-        if _graph_map[graph]['triples'] < _chunksize:
-            if global_params[graph+'_handle']:
+        if _graph_map[graph]['triples'] < _chunk_size:
+            # No handle exists
+            if graph+'_handle' not in global_params:
                 fname = global_params[graph+'_out']
-                fname = re.sub('.ttl$', '-'+str(_graph_map[graph]['triples']['chunk'])+'.ttl',fname)
+                fname = re.sub('.ttl$', '-'+str(_graph_map[graph]['chunk'])+'.ttl',fname)
                 global_params[graph+'_handle'] = codecs.open(fname, "w", encoding='utf8')
                 global_params[graph+'_handle'].write(render_turtle_namespace(global_params[graph + '_ns']))
-
+            # we've a handle now
             return global_params[graph+'_handle']
-        else: # > chunksize
+        else: # > chunksize, need a new file opened
             global_params[graph+'_handle'].write(' .')
             global_params[graph+'_handle'].close()
 
             _graph_map[graph]['triples'] = 0
             _graph_map[graph]['chunk'] += 1
             fname = global_params[graph+'_out']
-            fname = re.sub('.ttl$', '-'+str(_graph_map[graph]['triples']['chunk'])+'.ttl',fname)
+            fname = re.sub('.ttl$', '-'+str(_graph_map[graph]['chunk'])+'.ttl',fname)
             global_params[graph+'_handle'] = codecs.open(fname, "w", encoding='utf8')
             global_params[graph+'_handle'].write(render_turtle_namespace(global_params[graph + '_ns']))
 
             return global_params[graph+'_handle']
     else:
-        if global_params[graph+'_handle']:
+        if graph+'_handle' not in global_params:
             fname = global_params[graph+'_out']
             global_params[graph+'_handle'] = codecs.open(fname, "w", encoding='utf8')
             global_params[graph+'_handle'].write(render_turtle_namespace(global_params[graph + '_ns']))
