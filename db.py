@@ -538,6 +538,8 @@ def current_handle(global_params, graph):
             global_params[graph+'_handle'].write(' .')
             global_params[graph+'_handle'].close()
 
+            _graph_map[graph]['last_subject'] = None
+            _graph_map[graph]['last_predicate'] = None
             _graph_map[graph]['triples'] = 0
             _graph_map[graph]['chunk'] += 1
             fname = global_params[graph+'_out']
