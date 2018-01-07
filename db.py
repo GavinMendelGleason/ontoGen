@@ -977,7 +977,7 @@ if __name__ == "__main__":
                    'x' : 'http://www.w3.org/2001/XMLSchema#',
                    'p' : 'http://www.w3.org/ns/prov#',
                    'i' : 'http://dacura.scss.tcd.ie/instance/dacura#'}
-        global_params['prov_ns'] = instance_ns
+        global_params['prov_ns'] = prov_ns
         current_handle(global_params,'prov')
 
     if global_params['variant_out'] != 'turtle':
