@@ -465,8 +465,7 @@ def insert_quad(sub,pred,obj,graph,params):
             logging.info("Failed to write point:\n")
             logging.info(render_point(sub,'URI') + ' ' + render_point(pred,'URI') + ' ' + render_point(obj,'URI') + ' .\n')
     else:
-        s = current_handle(params, 'instance')
-        render_ttl_triple(sub,pred,obj,graph,s)
+        render_ttl_triple(sub,pred,obj,graph,params)
 
 def render_otriple(a,b,c,ns):
     a = expand(a,ns)
@@ -495,118 +494,127 @@ def obj_or_lit(o):
         return s
     else:
         return o
+
+def init_graph(global_params,graph):
+    if not 'graph_map' in global_params:
+        global_params['graph_map'] = {}
+    graph_map = global_params['graph_map']
+    graph_map[graph] = {'last_subject' : None, 'last_predicate' : None, 'triples' : 0, 'chunk' : 0}
+
+def finalise_graphs(global_params):
+    graph_map = global_params['graph_map']
+    for g in graph_map:
+        if graph_map[g]['last_subject'] != None and 'handle' in graph_map[g]:
+            graph_map[g]['handle'].write(' .')
+            graph_map[g]['handle'].close()
         
-_graph_map = {}
-def render_ttl_triple(a,b,c,g,stream):
-    global _graph_map
+def render_ttl_triple(a,b,c,g,params):
+    stream = current_handle(params, g)
+    graph_map = params['graph_map']
     
-    if not (g in _graph_map): 
-        _graph_map[g] = {'last_subject' : None, 'last_predicate' : None, 'triples' : 0, 'chunk' : 0}
+    if not (g in graph_map): 
+        graph_map[g] = {'last_subject' : None, 'last_predicate' : None, 'triples' : 0, 'chunk' : 0}
         
-    if a == _graph_map[g]['last_subject']:
-        if b == _graph_map[g]['last_predicate']:
+    if a == graph_map[g]['last_subject']:
+        if b == graph_map[g]['last_predicate']:
             stream.write(u' ,\n\t\t' + obj_or_lit(c))
         else:
             stream.write(u' ;\n\t' + b + u' ' + obj_or_lit(c))
-    elif _graph_map[g]['last_subject'] == None:
+    elif graph_map[g]['last_subject'] == None:
         stream.write(a + u' ' + b + u' ' + obj_or_lit(c))
     else:	                   
         stream.write(u' .\n\n' + a + u' ' + b + u' ' + obj_or_lit(c))
 
-    _graph_map[g]['last_subject'] = a
-    _graph_map[g]['last_predicate'] = b
-    _graph_map[g]['triples'] += 1
+    graph_map[g]['last_subject'] = a
+    graph_map[g]['last_predicate'] = b
+    graph_map[g]['triples'] += 1
 
 # 33 million is about 1G of triples usually. 
-_chunk_size = 33000000
 def current_handle(global_params, graph):
-    global _graph_map, _chunk_size
+    graph_map = global_params['graph_map']
+    chunk_size = global_params['chunk_size']
 
-    if not (graph in _graph_map): 
-        _graph_map[graph] = {'last_subject' : None, 'last_predicate' : None, 'triples' : 0, 'chunk' : 0}
+    if not (graph in graph_map): 
+        raise Exception("Graph never initialised")
+        
     if global_params['chunk_output']:
-        if _graph_map[graph]['triples'] < _chunk_size:
+        if graph_map[graph]['triples'] < chunk_size:
             # No handle exists
-            if graph+'_handle' not in global_params:
-                fname = global_params[graph+'_out']
-                fname = re.sub('.ttl$', '-'+str(_graph_map[graph]['chunk'])+'.ttl',fname)
-                global_params[graph+'_handle'] = codecs.open(fname, "w", encoding='utf8')
-                global_params[graph+'_handle'].write(render_turtle_namespace(global_params[graph + '_ns']))
+            if 'handle' not in graph_map[graph]:
+                fname = graph_map[graph]['out']
+                fname = re.sub('.ttl$', '-'+str(graph_map[graph]['chunk'])+'.ttl',fname)
+                graph_map[graph]['handle'] = codecs.open(fname, "w", encoding='utf8')
+                graph_map[graph]['handle'].write(render_turtle_namespace(graph_map[graph]['ns']))
             # we've a handle now
-            return global_params[graph+'_handle']
+            return graph_map[graph]['handle']
         else: # > chunksize, need a new file opened
-            global_params[graph+'_handle'].write(' .')
-            global_params[graph+'_handle'].close()
+            graph_map[graph]['handle'].write(' .')
+            graph_map[graph]['handle'].close()
 
-            _graph_map[graph]['last_subject'] = None
-            _graph_map[graph]['last_predicate'] = None
-            _graph_map[graph]['triples'] = 0
-            _graph_map[graph]['chunk'] += 1
-            fname = global_params[graph+'_out']
-            fname = re.sub('.ttl$', '-'+str(_graph_map[graph]['chunk'])+'.ttl',fname)
-            global_params[graph+'_handle'] = codecs.open(fname, "w", encoding='utf8')
-            global_params[graph+'_handle'].write(render_turtle_namespace(global_params[graph + '_ns']))
+            graph_map[graph]['last_subject'] = None
+            graph_map[graph]['last_predicate'] = None
+            graph_map[graph]['triples'] = 0
+            graph_map[graph]['chunk'] += 1
+            fname = graph_map[graph]['out']
+            fname = re.sub('.ttl$', '-'+str(graph_map[graph]['chunk'])+'.ttl',fname)
+            graph_map[graph]['handle'] = codecs.open(fname, "w", encoding='utf8')
+            graph_map[graph]['handle'].write(render_turtle_namespace(graph_map[graph]['ns']))
 
-            return global_params[graph+'_handle']
+            return graph_map[graph]['handle']
     else:
-        if graph+'_handle' not in global_params:
-            fname = global_params[graph+'_out']
-            global_params[graph+'_handle'] = codecs.open(fname, "w", encoding='utf8')
-            global_params[graph+'_handle'].write(render_turtle_namespace(global_params[graph + '_ns']))
+        if 'handle' not in graph_map[graph]:
+            fname = graph_map[graph]['out']
+            graph_map[graph]['handle'] = codecs.open(fname, "w", encoding='utf8')
+            graph_map[graph]['handle'].write(render_turtle_namespace(graph_map[graph]['ns']))
     
-        return global_params[graph+'_handle']
+        return graph_map[graph]['handle']
     
-def create_prov_db(params):
-    s = current_handle(params, 'prov')
-    
+def create_prov_db(params):    
     db = genid(params['db'],'d')
-    render_ttl_triple(db,'a','d:Database','prov',s)
-    render_ttl_triple(db,'d:dbType',(params['variant'],'x:string'),'prov',s)
-    render_ttl_triple(db,'d:dbHost',(params['host'],'x:string'),'prov',s)
-    render_ttl_triple(db,'d:dbName',(params['db'],'x:string'),'prov',s)
-    render_ttl_triple(db,'r:label',(params['db'],'x:string'),'prov',s)
-    render_ttl_triple(db,'p:CreatedBy','d:ontoGen','prov',s)
+    
+    render_ttl_triple(db,'a','d:Database','prov',params)
+    render_ttl_triple(db,'d:dbType',(params['variant'],'x:string'),'prov',params)
+    render_ttl_triple(db,'d:dbHost',(params['host'],'x:string'),'prov',params)
+    render_ttl_triple(db,'d:dbName',(params['db'],'x:string'),'prov',params)
+    render_ttl_triple(db,'r:label',(params['db'],'x:string'),'prov',params)
+    render_ttl_triple(db,'p:CreatedBy','d:ontoGen','prov',params)
     
     return db
 
 def create_prov_table(dburi,table,columns,params):
-    s = current_handle(params, 'prov')
-        
     table = genid(table,'d')
-    render_ttl_triple(table,'a','d:Table','prov',s)
-    render_ttl_triple(table,'r:label',(table,'x:string'),'prov',s)
-    render_ttl_triple(table,'d:inDB',dburi,'prov',s)
+    
+    render_ttl_triple(table,'a','d:Table','prov',params)
+    render_ttl_triple(table,'r:label',(table,'x:string'),'prov',params)
+    render_ttl_triple(table,'d:inDB',dburi,'prov',params)
 
     column_map = {}
     for column in columns:
         idx = 0
         key_uri = None
         column_uri = genid(column['Field'],'d')
-        render_ttl_triple(column_uri,'a','d:Column','prov',s)
-        render_ttl_triple(column_uri,'r:label', (column['Field'],'x:string'),'prov',s)
-        render_ttl_triple(column_uri,'d:type', (column['Type'],'x:string'),'prov',s)
-        render_ttl_triple(column_uri,'d:table', table,'prov',s)
+        render_ttl_triple(column_uri,'a','d:Column','prov',params)
+        render_ttl_triple(column_uri,'r:label', (column['Field'],'x:string'),'prov',params)
+        render_ttl_triple(column_uri,'d:type', (column['Type'],'x:string'),'prov',params)
+        render_ttl_triple(column_uri,'d:table', table,'prov',params)
 
         if is_primary(column):
-            render_ttl_triple(column_uri,'d:isPrimaryKey',('true','x:boolean'),'prov',s)
+            render_ttl_triple(column_uri,'d:isPrimaryKey',('true','x:boolean'),'prov',params)
         
         column_map[column['Field']] = column_uri
     
     return column_map
 
 def insert_prov_record(obj,column_uri,params):
-    s = params['prov_handle']
-    render_ttl_triple(obj,'d:inColumn',column_uri,'prov',s)
+    render_ttl_triple(obj,'d:inColumn',column_uri,'prov',params)
     return None
 
 def insert_literal_prov_record(sub,pred,column_uri,params):
-    s = current_handle(params, 'prov')
-        
     subobj = genid('litRec','i')
-    render_ttl_triple(sub,'d:literalRecord',subobj,'prov',s)
-    render_ttl_triple(subobj,'a','d:LiteralRecord','prov',s)
-    render_ttl_triple(subobj,'d:valInColumn',column_uri,'prov',s)
-    render_ttl_triple(subobj,'d:usingPred',pred,'prov',s)
+    render_ttl_triple(sub,'d:literalRecord',subobj,'prov',params)
+    render_ttl_triple(subobj,'a','d:LiteralRecord','prov',params)
+    render_ttl_triple(subobj,'d:valInColumn',column_uri,'prov',params)
+    render_ttl_triple(subobj,'d:usingPred',pred,'prov',params)
     return None
 
 def insert_typed_quad(sub,pred,val,ty,graph,params):
@@ -640,8 +648,7 @@ def insert_typed_quad(sub,pred,val,ty,graph,params):
 
     else:
         xsdty = get_type_assignment(ty)
-        s = current_handle(params, 'instance')
-        render_ttl_triple(sub,pred,(val,xsdty),graph,s)
+        render_ttl_triple(sub,pred,(val,xsdty),graph,params)
 
 def register_object(table,columns,keys,row,swizzle_table,global_params):
 
@@ -659,7 +666,7 @@ def register_object(table,columns,keys,row,swizzle_table,global_params):
     # Add the type information to triples
     class_uri = class_of(table,global_params)
     register_uri(class_uri,global_params)
-    insert_quad(uri,'a',class_uri,global_params['instance'],global_params)
+    insert_quad(uri,'a',class_uri,'instance',global_params)
     
     if 'dbo_out' in global_params and global_params['dbo_out']:
         global_params['dbo_out'].commit()        
@@ -715,7 +722,7 @@ where %(key)s = %(val)s""" % { 'field' : rcc['Field'],
                             register_uri(uri,global_params)
                             register_uri(pred_uri,global_params)
                             register_uri(obj_uri,global_params)
-                            insert_quad(uri,pred_uri,obj_uri,global_params['instance'],global_params)
+                            insert_quad(uri,pred_uri,obj_uri,'instance',global_params)
                             column_uri = global_params['column_table_map'][table][c['Field']]                            
                             insert_prov_record(obj_uri,column_uri,global_params)
                             if 'dbo_out' in global_params and global_params['dbo_out']:
@@ -736,7 +743,7 @@ where %(key)s = %(val)s""" % { 'field' : rcc['Field'],
             ty = convert_type(c['Type'],global_params)
             register_uri(uri,global_params)
             register_uri(pred_uri,global_params)          
-            insert_typed_quad(uri,pred_uri,val,ty,global_params['instance'],global_params)
+            insert_typed_quad(uri,pred_uri,val,ty,'instance',global_params)
             column_uri = global_params['column_table_map'][table][c['Field']]                            
             insert_literal_prov_record(uri,pred_uri,column_uri,global_params)
 
@@ -915,10 +922,11 @@ if __name__ == "__main__":
     parser.add_argument('--log-file', help='Log location', default=config.LOG_PATH)
     parser.add_argument('--fragment', help='Number of records to process (-1 == all)', action='store_true')
 
-    parser.add_argument('--chunk-output',help='',action='store_true')
-    
+    parser.add_argument('--chunk-output',help='Create multiple output files numbered ascending',action='store_true')
+    parser.add_argument('--chunk-size',help='Specify the approximate size of output files in triples',default=config.CHUNK_SIZE)
     global_params = vars(parser.parse_args())
-
+    global_params['graph_map'] = {}
+    
     # might need this
     # sys.setdefaultencoding('utf8')
     
@@ -962,33 +970,31 @@ if __name__ == "__main__":
         f.write(schema)
         
     if global_params['variant_out'] == 'turtle':
+        init_graph(global_params,'instance')
         instance_ns = {'d' : 'http://dacura.scss.tcd.ie/ontology/dacuraDataset#',
                        'r' : 'http://www.w3.org/2000/01/rdf-schema#',
                        'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
                        'ipg' : 'http://dacura.scss.tcd.ie/ontology/ipg#',
                        'x' : 'http://www.w3.org/2001/XMLSchema#',
                        'i' : 'http://dacura.scss.tcd.ie/instance/dacura#'}
-        global_params['instance_ns'] = instance_ns
-        current_handle(global_params,'instance')
+        global_params['graph_map']['instance']['out'] = global_params['instance_out']
+        global_params['graph_map']['instance']['ns'] = instance_ns
 
+        init_graph(global_params,'prov')
         prov_ns = {'d' : 'http://dacura.scss.tcd.ie/ontology/dacuraDataset#',
                    'r' : 'http://www.w3.org/2000/01/rdf-schema#',
                    'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
                    'x' : 'http://www.w3.org/2001/XMLSchema#',
                    'p' : 'http://www.w3.org/ns/prov#',
                    'i' : 'http://dacura.scss.tcd.ie/instance/dacura#'}
-        global_params['prov_ns'] = prov_ns
-        current_handle(global_params,'prov')
+        global_params['graph_map']['prov']['out'] = global_params['prov_out']
+        global_params['graph_map']['prov']['ns'] = prov_ns        
 
     if global_params['variant_out'] != 'turtle':
         raise Exception("Everything has gone terribly wrong since DB variants are not currently PROV-O-ified.")
         
     lift_instance_data(tcd,global_params)
 
-
     if global_params['variant_out'] == 'turtle':
-        global_params['instance_handle'].write(' .')
-        global_params['instance_handle'].close()
-
-        global_params['prov_handle'].write(' .')
-        global_params['prov_handle'].close()
+        finalise_graphs(global_params)
+    
