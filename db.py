@@ -716,13 +716,17 @@ where %(key)s = %(val)s""" % { 'field' : rcc['Field'],
                         cursorprime = get_dict_cursor(global_params)
                         cursorprime.execute(keyed_value_stmt)
                         keyrow = cursorprime.fetchone()
+                        print(keyrow)
                         if keyrow and cc['REFERENCED_TABLE_NAME']+str(keyrow.values()) in swizzle_table:
+                            print("Inside of referenced table")
                             pred_uri = compose_name(cc,rcc, global_params)
                             obj_uri = swizzle_table[cc['REFERENCED_TABLE_NAME']+str(keyrow.values())]
                             register_uri(uri,global_params)
                             register_uri(pred_uri,global_params)
                             register_uri(obj_uri,global_params)
+                            
                             insert_quad(uri,pred_uri,obj_uri,'instance',global_params)
+                            print("\nInserting quad, why don't I have a prov record?")
                             column_uri = global_params['column_table_map'][table][c['Field']]                            
                             insert_prov_record(obj_uri,column_uri,global_params)
                             if 'dbo_out' in global_params and global_params['dbo_out']:
