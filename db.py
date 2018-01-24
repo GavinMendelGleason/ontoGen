@@ -990,6 +990,7 @@ if __name__ == "__main__":
                    'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
                    'x' : 'http://www.w3.org/2001/XMLSchema#',
                    'p' : 'http://www.w3.org/ns/prov#',
+                   'ipg' : 'http://dacura.scss.tcd.ie/ontology/ipg#',
                    'i' : 'http://dacura.scss.tcd.ie/instance/dacura#'}
         global_params['graph_map']['prov']['out'] = global_params['prov_out']
         global_params['graph_map']['prov']['ns'] = prov_ns        
