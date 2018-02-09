@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import re
+import argparse
+import subprocess
+import os
+import sys
+import shlex
+
+basepath = '/home/gavin/build/ClioPatria'
+ttlout = basepath + '/cpack/dacura/applications/output'
+hdtout = basepath + '/cpack/dacura/applications/hdtdb'
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run IPGs data reconstruction')
+    #parser.add_argument('--base', help='Turtle file containing schema', default='instance')
+    global_params = vars(parser.parse_args())
+
+    swiplcmd = basepath + "/run.pl --after_load='G=instance,fastTripleMap:runRules(G),halt.'"
+    print(swiplcmd)
+    p = subprocess.Popen(swiplcmd,cwd=basepath,shell=True)
+    (stdout, stderr) = p.communicate()
+    p.wait()
+
+    # encoding bug hack...
+    textcmd = u"""sed -i 's/Krosno Odrzańskie[^"]*/Krosno Odrzańskie/g' """ + ttlout+'/ipg.ttl'
+    print(textcmd)
+    p = subprocess.Popen(textcmd, shell=True)
+    (stdout, stderr) = p.communicate()
+    p.wait()
+    
+    transformcmd = 'rdf2hdt -f turtle '+ttlout+'/ipg.ttl '+hdtout+'/ipg.hdt'
+    print(transformcmd)
+    p = subprocess.Popen(transformcmd,shell=True)
+    (stdout, stderr) = p.communicate()
+    p.wait()
+
+    force_reidx = "rm "+hdtout+"/*.index.*"
+    print(force_reidx)
+    p = subprocess.Popen(force_reidx,shell=True)
+    (stdout, stderr) = p.communicate()
+    p.wait()
+    
+    swiplcmd2 = basepath + "/run.pl --after_load='checker:runIPGRVO,halt.'"
+    print(swiplcmd2)
+    p = subprocess.Popen(swiplcmd2,cwd=basepath,shell=True)
+    (stdout, stderr) = p.communicate()
+    p.wait()
