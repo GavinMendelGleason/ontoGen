@@ -294,11 +294,11 @@ def composite(col,cols):
     return col in p
 
 def column_id(table,column):
-    return table + '_' + column
+    return table + '$' + column
 
 def column_label(table,column):
     name = column_id(table,column)
-    name = re.sub('_',' ', name)
+    name = re.sub('$',' ', name)
     return name
 
 def column_name(table,column,args):
@@ -306,12 +306,12 @@ def column_name(table,column,args):
     return args['domain_name'] + ':' + cleaned_uri
 
 def compose_id(cc,rcc):
-    return 'fk-' + cc['REFERENCED_TABLE_NAME'] + '_' + cc['REFERENCED_COLUMN_NAME']
+    return 'fk-' + cc['REFERENCED_TABLE_NAME'] + '$' + cc['REFERENCED_COLUMN_NAME']
 
 def compose_label(cc,rcc):
     name = compose_id(cc,rcc)
-    name = re.sub('_',' ', name)
-    name = re.sub('-',' ', name)
+    name = re.sub('$',' ', name)
+    name = re.sub('$',' ', name)
     return name
 
 def compose_name(cc,rcc,args):
@@ -319,7 +319,7 @@ def compose_name(cc,rcc,args):
     return args['domain_name'] + ':' + cleaned_uri
 
 def label_of(table):
-    table = re.sub('_',' ', table)
+    table = re.sub('$',' ', table)
     return table
 
 def class_of(table,args):

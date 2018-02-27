@@ -42,8 +42,8 @@ if __name__ == "__main__":
     (stdout, stderr) = p.communicate()
     p.wait()
     
-    swiplcmd2 = basepath + "/run.pl --after_load='checker:runIPGRVO,halt.'"
-    print(swiplcmd2)
-    p = subprocess.Popen(swiplcmd2,cwd=basepath,shell=True)
-    (stdout, stderr) = p.communicate()
-    p.wait()
+    #swiplcmd2 = basepath + "/run.pl --after_load='checker:runIPGRVO,halt.'"
+    #print(swiplcmd2)
+    #p = subprocess.Popen(swiplcmd2,cwd=basepath,shell=True)
+    #(stdout, stderr) = p.communicate()
+    #p.wait()
