@@ -17,6 +17,12 @@ if __name__ == "__main__":
     #parser.add_argument('--base', help='Turtle file containing schema', default='instance')
     global_params = vars(parser.parse_args())
 
+    indexcmd = "hdtSearch -q 0 "+hdtout+"/instance.hdt"
+    print(indexcmd)
+    p = subprocess.Popen(indexcmd,shell=True)
+    (stdout, stderr) = p.communicate()
+    p.wait()
+    
     swiplcmd = basepath + "/run.pl --after_load='G=instance,fastTripleMap:runRules(G),halt.'"
     print(swiplcmd)
     p = subprocess.Popen(swiplcmd,cwd=basepath,shell=True)
@@ -24,7 +30,8 @@ if __name__ == "__main__":
     p.wait()
 
     # encoding bug hack...
-    textcmd = u"""sed -i 's/Krosno Odrzańskie[^"]*/Krosno Odrzańskie/g' """ + ttlout+'/ipg.ttl'
+    # turns out this is due to a swipl backwards compatibillity hack for archaic prologs
+    textcmd = u"""sed -i 's/\\\\240\\\\//g' """ + ttlout+'/ipg.ttl'
     print(textcmd)
     p = subprocess.Popen(textcmd, shell=True)
     (stdout, stderr) = p.communicate()
@@ -35,15 +42,33 @@ if __name__ == "__main__":
     p = subprocess.Popen(transformcmd,shell=True)
     (stdout, stderr) = p.communicate()
     p.wait()
-
+    
     force_reidx = "rm "+hdtout+"/*.index.*"
     print(force_reidx)
     p = subprocess.Popen(force_reidx,shell=True)
     (stdout, stderr) = p.communicate()
     p.wait()
     
-    #swiplcmd2 = basepath + "/run.pl --after_load='checker:runIPGRVO,halt.'"
-    #print(swiplcmd2)
-    #p = subprocess.Popen(swiplcmd2,cwd=basepath,shell=True)
-    #(stdout, stderr) = p.communicate()
-    #p.wait()
+    ipg_indexcmd = "hdtSearch -q 0 "+hdtout+"/ipg.hdt"
+    print(ipg_indexcmd)
+    p = subprocess.Popen(ipg_indexcmd,shell=True)
+    (stdout, stderr) = p.communicate()
+    p.wait()
+
+    prov_indexcmd = "hdtSearch -q 0 "+hdtout+"/prov.hdt"
+    print(prov_indexcmd)
+    p = subprocess.Popen(prov_indexcmd,shell=True)
+    (stdout, stderr) = p.communicate()
+    p.wait()
+
+    schema_indexcmd = "hdtSearch -q 0 "+hdtout+"/newipg.hdt"
+    print(schema_indexcmd)
+    p = subprocess.Popen(schema_indexcmd,shell=True)
+    (stdout, stderr) = p.communicate()
+    p.wait()
+
+    swiplcmd2 = basepath + "/run.pl --after_load='checker:runIPGRVO,halt.'"
+    print(swiplcmd2)
+    p = subprocess.Popen(swiplcmd2,cwd=basepath,shell=True)
+    (stdout, stderr) = p.communicate()
+    p.wait()
