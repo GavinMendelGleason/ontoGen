@@ -134,10 +134,17 @@ AND g.uri = $4;
 def get_tables(global_params):
     cur = global_params['dbo'].cursor()
 
-    stmt = """
-SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_SCHEMA=%(database)s
-    """
+    if global_params['variant'] == 'mysql':
+        stmt = """
+        SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_SCHEMA=%(database)s
+        """
+    elif global_params['variant'] == 'postgres':
+        stmt = """
+        SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_CATALOG=%(database)s AND TABLE_SCHEMA='public'
+        """
+        
     cur.execute(stmt, {'database' : config.DB})
     
     tables = [ table for (table,) in cur.fetchall() ]
@@ -165,6 +172,7 @@ def intermediate_class_name(cs):
 
 def constraints(name_table,global_params):
     tables = get_tables(global_params)
+
     stmt = None
     
     if global_params['variant'] == 'mysql':
@@ -256,12 +264,20 @@ def get_type_assignment(ty):
     """This needs to be extended"""
     if re.search('int',ty):
         return 'x:integer'
-    elif re.search('varchar',ty) or re.search('text', ty) or re.search('character varying',ty):
+    elif re.search('varchar',ty) or re.search('char', ty) or re.search('name', ty) or re.search('text', ty) or re.search('character varying',ty) or re.search('pg_node_tree', ty) or re.search('regproc', ty) or re.search('xid', ty) or re.search('bytea', ty) or re.search('USER-DEFINED', ty):
         return 'x:string'
-    elif re.search('date',ty):
+    elif re.search('date',ty) or re.search('time',ty):
         return 'x:dateTime'
     elif re.search('timestamp without time zone', ty):
         return 'x:dateTime'
+    elif re.search('numeric',ty) or re.search('real',ty):
+        return 'x:decimal'
+    elif re.search('oid',ty):
+        return 'x:integer'
+    elif re.search('boolean',ty):
+        return 'x:boolean'
+    elif re.search('ARRAY',ty) or re.search('anyarray',ty):
+        return 'x:string'
     else:
         print("About to spew literal, what's up?")
         print("incoming type: %s" % ty)
@@ -488,8 +504,12 @@ def obj_or_lit(o):
         if ty == 'x:dateTime':
             l = l.isoformat()
         elif ty == 'x:string':
-            l = l.replace('\\','\\\\')
-            l = l.replace('"','\\"')
+            if type(l) == type([]):
+                print("asdf")
+                l = "%s" % l
+            else:
+                l = l.replace('\\','\\\\')
+                l = l.replace('"','\\"')
         s = u'"%s"^^%s' % (l, ty)
         return s
     else:
@@ -685,6 +705,7 @@ def register_object(table,columns,keys,row,swizzle_table,global_params):
                 'where' : where,
                 'table' : table}
 
+        print(column_stmt)
         column_cursor.execute(column_stmt)
         obj = column_cursor.fetchone()
 
@@ -716,7 +737,7 @@ where %(key)s = %(val)s""" % { 'field' : rcc['Field'],
                         cursorprime = get_dict_cursor(global_params)
                         cursorprime.execute(keyed_value_stmt)
                         keyrow = cursorprime.fetchone()
-                        print(keyrow)
+                        # print(keyrow)
                         if keyrow and cc['REFERENCED_TABLE_NAME']+str(keyrow.values()) in swizzle_table:
                             print("Inside of referenced table")
                             pred_uri = compose_name(cc,rcc, global_params)
@@ -784,7 +805,7 @@ def lift_instance_data(tcd, global_params):
     global_params['column_table_map'] = {}
     # Pass 1 to get swizzle table
     for table in tables:
-        
+
         columns = table_columns(table, global_params)
         prov_column_map = create_prov_table(global_params['db_uri'],table,columns,global_params)
         global_params['column_table_map'][table] = prov_column_map
@@ -966,9 +987,7 @@ if __name__ == "__main__":
     do_connect(global_params)
     
     tcd = constraints(name_table,global_params)
-
     doc = run_class_construction(tcd,global_params)
-
     schema = render_turtle(doc,global_params)
     with codecs.open(global_params['schema_out'], "w", encoding='utf8') as f:
         f.write(schema)
