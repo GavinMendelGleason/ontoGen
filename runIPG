@@ -9,13 +9,20 @@ import sys
 import shlex
 
 basepath = '/home/gavin/build/ClioPatria'
-ttlout = basepath + '/cpack/dacura/applications/output'
-hdtout = basepath + '/cpack/dacura/applications/hdtdb'
+ttlout = basepath + '/cpack/dqs/applications/output'
+hdtout = basepath + '/cpack/dqs/applications/hdtdb'
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run IPGs data reconstruction')
     #parser.add_argument('--base', help='Turtle file containing schema', default='instance')
     global_params = vars(parser.parse_args())
+        
+    force_reidx = "rm "+hdtout+"/*.index.*"
+    print(force_reidx)
+    p = subprocess.Popen(force_reidx,shell=True)
+    (stdout, stderr) = p.communicate()
+    p.wait()
+    
 
     indexcmd = "hdtSearch -q 0 "+hdtout+"/instance.hdt"
     print(indexcmd)
