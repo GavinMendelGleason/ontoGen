@@ -8,7 +8,7 @@ import os
 import sys
 import shlex
 
-basepath = '/home/gavin/build/ClioPatria'
+basepath = '~/build/ClioPatria'
 ttlout = basepath + '/cpack/dqs/applications/output'
 hdtout = basepath + '/cpack/dqs/applications/hdtdb'
 
